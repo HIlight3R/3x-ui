@@ -331,10 +331,30 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
-	listener, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return err
+	var listener net.Listener
+	if listen == "0.0.0.0" || listen == "" {
+		// Try IPv4 first
+		addr4 := net.JoinHostPort("0.0.0.0", strconv.Itoa(port))
+		l4, err4 := net.Listen("tcp4", addr4)
+		if err4 == nil {
+			listener = l4
+		} else {
+			// Try IPv6
+			addr6 := net.JoinHostPort("::", strconv.Itoa(port))
+			l6, err6 := net.Listen("tcp6", addr6)
+			if err6 == nil {
+				listener = l6
+			} else {
+				return fmt.Errorf("failed to bind on 0.0.0.0 (IPv4) and :: (IPv6): %v / %v", err4, err6)
+			}
+		}
+	} else {
+		listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
+		var err error
+		listener, err = net.Listen("tcp", listenAddr)
+		if err != nil {
+			return err
+		}
 	}
 	if certFile != "" || keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
